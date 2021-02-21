@@ -1,7 +1,8 @@
 //Hook de estado nos srive para almacenar datos y modificar
-import React, {useState} from 'react'
+//useEffect nos sirve para validar cuando la pagina cargue
+import React, {useState, useEffect} from 'react'
 import { isEmpty, size } from 'lodash'
-import shortid from 'shortid'
+import { addDocument, deleteDocument, getCollection, updateDocument } from './actions'
 
 function App() {
   const [task, setTask] = useState("")
@@ -9,6 +10,16 @@ function App() {
   const [editMode, setEditMode] = useState(false)
   const [id, setId] = useState("")
   const [error, setError] = useState(null)
+
+  //este metodo se ejecuta cuando la pagina cargue
+  useEffect(() => {
+    (async () => {
+      const result = await getCollection("tasks")
+      if (result.statusResponse) {
+        setTasks(result.data)
+      }
+    })()
+  }, [])
 
   const validForm = () => {
     let isValid = true
@@ -22,22 +33,29 @@ function App() {
     return isValid
   }
 
-  const addTask = (e) => {
+  const addTask = async(e) => {
     //nos permite no recaragr la pagina al darle en el submit
     e.preventDefault()
     if (!validForm()) {
       return
     }
-    const newTask = {
-      //ShortId  nos permite generar ids incrementables
-      id: shortid.generate(),
-      name: task
+
+    //Nos permite adicionar una tarea a la base de datos
+    const result = await addDocument("tasks", {name: task})
+    if(!result.statusResponse){
+      setError(result.error)
+      return
     }
-    setTasks([...tasks, newTask])
+    setTasks([...tasks, { id : result.data.id, name: task} ] )
     setTask("")
   }
 
-  const deleteTask = (id) => {
+  const deleteTask = async(id) => {
+    const result = await deleteDocument("tasks", id)
+    if (!result.statusResponse) {
+      setError(result.error)
+      return
+    }
     //el filter nos permite filtrar las tareas y con esto poder eliminarlas del lienzo
     const filteredTasks = tasks.filter(task => task.id !== id)
     setTasks(filteredTasks)
@@ -49,9 +67,14 @@ function App() {
     setId(theTask.id)
   }
 
-  const saveTask = (e) => {
+  const saveTask = async(e) => {
     e.preventDefault()
     if(!validForm()){
+      return
+    }
+    const result = await updateDocument("tasks", id, {name: task})
+    if (!result.statusResponse) {
+      setError(result.error)
       return
     }
     //maps nos permite iterar  cada elemento de un array
